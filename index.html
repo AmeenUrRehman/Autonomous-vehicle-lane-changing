@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MPC Vehicle Lane-Change Interactive Simulator</title>
+<style>
+:root{
+  --bg:#07101f;
+  --bg2:#0c1730;
+  --card:#101d38;
+  --card2:#12264a;
+  --text:#eaf2ff;
+  --muted:#96a7c7;
+  --line:#243a66;
+  --cyan:#2ee6d6;
+  --blue:#4f8cff;
+  --purple:#b56cff;
+  --green:#72f2a5;
+  --amber:#ffd166;
+  --red:#ff5c7a;
+  --white:#ffffff;
+  --shadow:0 20px 50px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(79,140,255,.22), transparent 35%),
+    radial-gradient(circle at 80% 20%, rgba(46,230,214,.12), transparent 33%),
+    radial-gradient(circle at 70% 95%, rgba(181,108,255,.15), transparent 35%),
+    linear-gradient(135deg,#050914 0%,#081328 55%,#050914 100%);
+}
+.app{position:relative;height:100vh;display:grid;grid-template-rows:auto 1fr auto}
+.topbar{
+  height:70px;display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.08);
+  background:rgba(5,11,25,.82);backdrop-filter:blur(14px);z-index:5;
+}
+.brandMark{
+  width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:grid;place-items:center;color:#06101f;font-weight:900;box-shadow:0 0 30px rgba(79,140,255,.3);
+}
+.titleBlock{min-width:270px}
+.kicker{font-size:10px;letter-spacing:2.5px;color:var(--cyan);text-transform:uppercase;font-weight:800}
+.title{font-size:18px;font-weight:900;letter-spacing:.2px;line-height:1.1}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.chip{font-size:11px;padding:6px 10px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.05);color:var(--muted);white-space:nowrap}
+.chip strong{color:var(--green);font-weight:900}
+.mainGrid{height:100%;display:grid;grid-template-columns:330px minmax(0,1fr) 310px;gap:12px;padding:12px;min-height:0}
+.panel,.rightPanel,.canvasShell,.chartCard,.metricsCard{
+  background:rgba(12,23,48,.74);border:1px solid rgba(255,255,255,.09);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;
+}
+.panel,.rightPanel{min-height:0;overflow-y:auto;padding:14px}
+.panel::-webkit-scrollbar,.rightPanel::-webkit-scrollbar{width:8px}
+.panel::-webkit-scrollbar-thumb,.rightPanel::-webkit-scrollbar-thumb{background:rgba(79,140,255,.35);border-radius:10px}
+.section{margin-bottom:16px}
+.sectionHeader{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sectionTitle{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);font-weight:900}
+.sectionHint{font-size:10px;color:var(--muted)}
+.segment{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.segBtn,.actionBtn,.miniBtn{
+  border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--muted);
+  border-radius:12px;padding:9px 8px;font-weight:800;font-size:11px;letter-spacing:.3px;cursor:pointer;transition:.15s ease;
+}
+.segBtn:hover,.actionBtn:hover,.miniBtn:hover{border-color:rgba(46,230,214,.45);color:var(--text);background:rgba(46,230,214,.08)}
+.segBtn.active{background:linear-gradient(135deg,rgba(79,140,255,.35),rgba(46,230,214,.18));border-color:rgba(46,230,214,.65);color:var(--text)}
+.actionBtn{width:100%;font-size:13px;padding:12px 10px;border-radius:14px}
+.actionBtn.run{background:linear-gradient(135deg,rgba(34,197,94,.24),rgba(46,230,214,.12));border-color:rgba(114,242,165,.5);color:var(--green)}
+.actionBtn.stop{background:linear-gradient(135deg,rgba(255,92,122,.22),rgba(255,209,102,.08));border-color:rgba(255,92,122,.5);color:var(--red)}
+.actionRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.sliderBlock{padding:10px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.035);margin-bottom:9px}
+.sliderTop{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;align-items:baseline}
+.label{font-size:12px;color:var(--muted);font-weight:700}
+.value{font-size:12px;color:var(--green);font-weight:900;font-variant-numeric:tabular-nums}
+.unit{font-size:10px;color:#7183a9;margin-top:4px}
+input[type=range]{width:100%;appearance:none;height:5px;border-radius:999px;background:linear-gradient(90deg,var(--blue),var(--cyan));outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--cyan);box-shadow:0 0 18px rgba(46,230,214,.55)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--cyan);box-shadow:0 0 18px rgba(46,230,214,.55)}
+.centerGrid{height:100%;display:grid;grid-template-rows:minmax(0,1fr) 184px;gap:12px;min-height:0}
+.canvasShell{position:relative;min-height:0;background:#050914}
+#simCanvas{width:100%;height:100%;display:block;background:#050914}
+.legend{
+  position:absolute;top:14px;left:14px;display:flex;gap:8px;flex-wrap:wrap;max-width:75%;
+}
+.legendItem{font-size:11px;color:var(--text);padding:7px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(5,10,20,.72);backdrop-filter:blur(8px);display:flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.ref{background:var(--blue)}.dot.actual{background:var(--green)}.dot.pred{background:var(--purple)}.dot.limit{background:var(--red)}
+canvas{display:block}
+.hud{
+  position:absolute;right:14px;top:14px;width:250px;border:1px solid rgba(255,255,255,.1);border-radius:18px;background:rgba(5,10,20,.75);backdrop-filter:blur(10px);padding:12px;
+}
+.hudTitle{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);font-weight:900;margin-bottom:8px}
+.hudGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hudMetric{padding:8px;border-radius:12px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}
+.hudMetric span{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.8px}
+.hudMetric strong{display:block;color:var(--text);font-size:15px;margin-top:3px;font-variant-numeric:tabular-nums}
+.progress{position:absolute;left:16px;right:16px;bottom:14px;height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.09)}
+.progressFill{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--cyan),var(--green));box-shadow:0 0 18px rgba(46,230,214,.4)}
+.satAlert{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);padding:8px 14px;border:1px solid rgba(255,92,122,.5);border-radius:999px;background:rgba(70,8,20,.82);color:#ffd5dc;font-size:12px;font-weight:900;display:none;box-shadow:0 0 25px rgba(255,92,122,.22)}
+.chartGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;min-height:0}
+.chartCard{position:relative;padding-top:24px;background:rgba(8,16,34,.88)}
+.chartLabel{position:absolute;top:8px;left:10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan);font-weight:900}
+.chartCard canvas{width:100%;height:100%}
+.rightPanel{display:flex;flex-direction:column;gap:12px}
+.metricsCard{padding:14px;background:rgba(8,16,34,.7)}
+.metricTitle{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan);font-weight:900;margin-bottom:10px}
+.metricGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bigMetric{padding:11px;border-radius:14px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07)}
+.bigMetric small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.6px}
+.bigMetric b{display:block;color:var(--white);font-size:18px;margin-top:4px;font-variant-numeric:tabular-nums}
+.bigMetric.good b{color:var(--green)}.bigMetric.warn b{color:var(--amber)}.bigMetric.bad b{color:var(--red)}
+.equationBox{font-family:Cambria,Georgia,serif;line-height:1.55;color:#dbe7ff;font-size:13px;border-radius:14px;padding:12px;background:linear-gradient(135deg,rgba(79,140,255,.1),rgba(46,230,214,.045));border:1px solid rgba(46,230,214,.18)}
+.equationBox .eqTitle{font-family:Inter,Segoe UI,Arial,sans-serif;font-size:10px;letter-spacing:1.8px;text-transform:uppercase;color:var(--cyan);font-weight:900;margin-bottom:6px}
+.flow{display:grid;gap:8px}
+.flowStep{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;padding:8px;border-radius:13px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}
+.flowNum{width:30px;height:30px;border-radius:10px;background:rgba(46,230,214,.14);display:grid;place-items:center;color:var(--cyan);font-weight:900}
+.flowText{font-size:12px;color:var(--muted);line-height:1.35}.flowText b{color:var(--text)}
+.footer{
+  min-height:32px;padding:8px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(5,11,25,.82);color:var(--muted);font-size:11px;display:flex;align-items:center;justify-content:space-between;gap:12px;z-index:5
+}
+.footer b{color:var(--text)}
+.pill{display:inline-block;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:3px 8px;margin:2px;background:rgba(255,255,255,.04);color:var(--muted);font-size:10px}
+.notice{font-size:11px;color:#9fb0d1;line-height:1.45;padding:10px;border-radius:14px;background:rgba(255,209,102,.06);border:1px solid rgba(255,209,102,.18)}
+.notice b{color:var(--amber)}
+@media(max-width:1180px){.mainGrid{grid-template-columns:300px 1fr}.rightPanel{display:none}.hud{width:230px}.chartGrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:820px){html,body{overflow:auto}.app{height:auto;min-height:100vh}.mainGrid{grid-template-columns:1fr;height:auto}.centerGrid{height:780px}.panel,.rightPanel{display:block}.rightPanel{height:auto}.topbar{height:auto;flex-wrap:wrap}.chips{margin-left:0}.footer{flex-direction:column;align-items:flex-start}.hud{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brandMark">MPC</div>
+    <div class="titleBlock">
+      <div class="kicker">Interactive Control Systems Lab</div>
+      <div class="title">Autonomous Vehicle Lane-Change Simulator</div>
+    </div>
+    <div class="chips">
+      <div class="chip">Mode: <strong id="chipMode">MPC</strong></div>
+      <div class="chip">Horizon: <strong id="chipHz">20</strong></div>
+      <div class="chip">Speed: <strong id="chipSpeed">20 m/s</strong></div>
+      <div class="chip">SCE 507 Project Demo</div>
+    </div>
+  </header>
+
+  <main class="mainGrid">
+    <aside class="panel">
+      <div class="section">
+        <div class="sectionHeader"><div class="sectionTitle">Controller</div><div class="sectionHint">choose one</div></div>
+        <div class="segment" id="modeButtons">
+          <button class="segBtn active" data-mode="mpc">MPC</button>
+          <button class="segBtn" data-mode="pid">PID</button>
+          <button class="segBtn" data-mode="open">Open</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="sectionHeader"><div class="sectionTitle">Trajectory</div><div class="sectionHint">reference path</div></div>
+        <div class="segment" id="trajectoryButtons">
+          <button class="segBtn" data-traj="1">Straight</button>
+          <button class="segBtn" data-traj="2">Tanh</button>
+          <button class="segBtn active" data-traj="3">Wave</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="sectionHeader"><div class="sectionTitle">Vehicle</div><div class="sectionHint">physical model</div></div>
+        <div id="vehicleSliders"></div>
+      </div>
+
+      <div class="section">
+        <div class="sectionHeader"><div class="sectionTitle">MPC Weights</div><div class="sectionHint">tuning</div></div>
+        <div id="mpcSliders"></div>
+      </div>
+
+      <div class="section">
+        <div class="sectionHeader"><div class="sectionTitle">Scenario</div><div class="sectionHint">initial test</div></div>
+        <div id="scenarioSliders"></div>
+      </div>
+
+      <div class="section">
+        <button class="actionBtn run" id="runBtn">RUN SIMULATION</button>
+        <div class="actionRow">
+          <button class="miniBtn" id="resetBtn">RESET</button>
+          <button class="miniBtn" id="csvBtn">EXPORT CSV</button>
+        </div>
+      </div>
+
+      <div class="notice">
+        <b>Learning goal:</b> change speed, tire stiffness, horizon, and weights; then compare path tracking, steering effort, saturation, and RMS error.
+      </div>
+    </aside>
+
+    <section class="centerGrid">
+      <div class="canvasShell">
+        <canvas id="simCanvas"></canvas>
+        <div class="legend">
+          <div class="legendItem"><span class="dot ref"></span>Reference path</div>
+          <div class="legendItem"><span class="dot actual"></span>Vehicle path</div>
+          <div class="legendItem"><span class="dot pred"></span>MPC prediction</div>
+          <div class="legendItem"><span class="dot limit"></span>Steering limit</div>
+        </div>
+        <div class="hud">
+          <div class="hudTitle">Live Telemetry</div>
+          <div class="hudGrid">
+            <div class="hudMetric"><span>time</span><strong id="liveTime">0.00 s</strong></div>
+            <div class="hudMetric"><span>steer</span><strong id="liveSteer">0.000 rad</strong></div>
+            <div class="hudMetric"><span>yaw</span><strong id="liveYaw">0.000 rad</strong></div>
+            <div class="hudMetric"><span>Y error</span><strong id="liveErr">0.00 m</strong></div>
+          </div>
+        </div>
+        <div class="satAlert" id="satAlert">STEERING SATURATION ACTIVE</div>
+        <div class="progress"><div class="progressFill" id="progressFill"></div></div>
+      </div>
+
+      <div class="chartGrid">
+        <div class="chartCard"><div class="chartLabel">Steering delta</div><canvas id="chartSteer"></canvas></div>
+        <div class="chartCard"><div class="chartLabel">Yaw tracking</div><canvas id="chartYaw"></canvas></div>
+        <div class="chartCard"><div class="chartLabel">Lateral position</div><canvas id="chartY"></canvas></div>
+        <div class="chartCard"><div class="chartLabel">Tracking error</div><canvas id="chartErr"></canvas></div>
+      </div>
+    </section>
+
+    <aside class="rightPanel">
+      <div class="metricsCard">
+        <div class="metricTitle">Simulation Scoreboard</div>
+        <div class="metricGrid">
+          <div class="bigMetric good"><small>Final eY</small><b id="mFinalY">-</b></div>
+          <div class="bigMetric"><small>RMSE Y</small><b id="mRmseY">-</b></div>
+          <div class="bigMetric warn"><small>Max |delta|</small><b id="mMaxDelta">-</b></div>
+          <div class="bigMetric"><small>Saturation</small><b id="mSatPct">-</b></div>
+          <div class="bigMetric"><small>RMSE psi</small><b id="mRmsePsi">-</b></div>
+          <div class="bigMetric good"><small>Rank C/O</small><b id="mRank">4 / 4</b></div>
+        </div>
+      </div>
+
+      <div class="metricsCard">
+        <div class="metricTitle">Model Used in the Website</div>
+        <div class="equationBox">
+          <div class="eqTitle">State vector and output</div>
+          x = [v_y, psi, r, Y]<sup>T</sup>, &nbsp; u = delta<br>
+          y = [psi, Y]<sup>T</sup><br><br>
+          x<sub>k+1</sub> = A<sub>d</sub>x<sub>k</sub> + B<sub>d</sub>u<sub>k</sub><br>
+          A<sub>d</sub> = I + T<sub>s</sub>A, &nbsp; B<sub>d</sub> = T<sub>s</sub>B
+        </div>
+      </div>
+
+      <div class="metricsCard">
+        <div class="metricTitle">How the MPC Loop Works</div>
+        <div class="flow">
+          <div class="flowStep"><div class="flowNum">1</div><div class="flowText"><b>Read state</b>: current v_y, psi, r, Y, and previous steering.</div></div>
+          <div class="flowStep"><div class="flowNum">2</div><div class="flowText"><b>Predict</b>: build future outputs over the selected horizon.</div></div>
+          <div class="flowStep"><div class="flowNum">3</div><div class="flowText"><b>Optimize</b>: minimize tracking error plus steering increment effort.</div></div>
+          <div class="flowStep"><div class="flowNum">4</div><div class="flowText"><b>Apply</b>: use only the first steering move, then repeat.</div></div>
+        </div>
+      </div>
+
+      <div class="metricsCard">
+        <div class="metricTitle">Class Connection</div>
+        <span class="pill">Nonlinear model</span>
+        <span class="pill">Linearization</span>
+        <span class="pill">State space</span>
+        <span class="pill">ZOH/Euler</span>
+        <span class="pill">Controllability</span>
+        <span class="pill">Observability</span>
+        <span class="pill">Finite-horizon optimal control</span>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <div>Original Python MPC/car simulation source attribution: <b>&copy; Mark Misin Engineering</b>. Web simulator and educational interface adaptation: <b>Ameen Ur Rehman</b>.</div>
+    <div>No warranty. Educational demonstration only.</div>
+  </footer>
+</div>
+
+<script>
+/*
+  Original Python MPC/car simulation source attribution:
+  Copyright label in the original Python source belongs to Mark Misin Engineering
+  and should not be removed from the original files. This browser version is an
+  educational web adaptation by Ameen Ur Rehman for SCE 507 project presentation.
+*/
+
+const P = {
+  m: 1500, Iz: 3000, Caf: 19000, Car: 33000, lf: 2, lr: 3,
+  Ts: 0.02, x_dot: 20, time_length: 10, lane_width: 7,
+  Qpsi: 1, Qy: 1, Rw: 1, hz: 20,
+  trajectory: 3, y0: 10, maxSteerDeg: 30,
+  mode: "mpc",
+  KpYaw: 7, KdYaw: 3, KiYaw: 0,
+  KpY: 0.55, KdY: 0.20, KiY: 0,
+  waveAmp: 4, waveFreq: 0.01
+};
+
+let simData = null;
+let playing = false;
+let frame = 0;
+let lastTick = 0;
+let rafId = null;
+let playSpeed = 1.0;
+
+const sliderDefsVehicle = [
+  ["x_dot","Longitudinal speed",5,40,20,1,"m/s"],
+  ["Caf","Front cornering stiffness",10000,40000,19000,500,"N/rad"],
+  ["Car","Rear cornering stiffness",10000,50000,33000,500,"N/rad"],
+  ["lf","Front axle distance",0.5,4,2,0.1,"m"],
+  ["lr","Rear axle distance",0.5,4,3,0.1,"m"]
+];
+const sliderDefsMPC = [
+  ["Qpsi","Yaw weight Q1",0.1,10,1,0.1,"tracking"],
+  ["Qy","Lateral weight Q2",0.1,20,1,0.1,"tracking"],
+  ["Rw","Input weight R",0.05,15,1,0.05,"steering smoothness"],
+  ["hz","Prediction horizon",5,45,20,1,"steps"],
+  ["maxSteerDeg","Steering limit",5,45,30,1,"deg"]
+];
+const sliderDefsScenario = [
+  ["y0","Initial Y offset",-15,15,10,0.5,"m"],
+  ["waveAmp","Wave amplitude",0,10,4,0.5,"m"],
+  ["waveFreq","Wave frequency",0.005,0.04,0.01,0.001,"cycles/m"],
+  ["playSpeed","Animation speed",0.25,3,1,0.25,"x"]
+];
+
+function fmtVal(key, value){
+  if(key === "hz") return Math.round(value).toString();
+  if(key === "Caf" || key === "Car") return Math.round(value).toString();
+  if(key === "waveFreq") return Number(value).toFixed(3);
+  if(key === "playSpeed") return Number(value).toFixed(2);
+  if(Math.abs(value) >= 10) return Number(value).toFixed(1);
+  return Number(value).toFixed(2);
+}
+
+function makeSlider(def){
+  const [key,label,min,max,val,step,unit] = def;
+  const wrap = document.createElement("div");
+  wrap.className = "sliderBlock";
+  wrap.innerHTML = `
+    <div class="sliderTop"><div class="label">${label}</div><div class="value" id="val_${key}">${fmtVal(key,val)}</div></div>
+    <input type="range" id="sl_${key}" min="${min}" max="${max}" value="${val}" step="${step}">
+    <div class="unit">${unit}</div>`;
+  return wrap;
+}
+
+function mountSliders(){
+  const groups = [
+    ["vehicleSliders", sliderDefsVehicle],
+    ["mpcSliders", sliderDefsMPC],
+    ["scenarioSliders", sliderDefsScenario]
+  ];
+  groups.forEach(([id, defs]) => {
+    const root = document.getElementById(id);
+    defs.forEach(def => root.appendChild(makeSlider(def)));
+  });
+  [...sliderDefsVehicle, ...sliderDefsMPC, ...sliderDefsScenario].forEach(def => {
+    const key = def[0];
+    const slider = document.getElementById("sl_" + key);
+    slider.addEventListener("input", () => {
+      const v = parseFloat(slider.value);
+      if(key === "playSpeed") playSpeed = v; else P[key] = v;
+      document.getElementById("val_" + key).textContent = fmtVal(key, v);
+      updateChips();
+      if(!playing) drawEmptyScene();
+    });
+  });
+}
+
+function updateChips(){
+  document.getElementById("chipMode").textContent = P.mode.toUpperCase();
+  document.getElementById("chipHz").textContent = String(Math.round(P.hz));
+  document.getElementById("chipSpeed").textContent = `${fmtVal("x_dot", P.x_dot)} m/s`;
+}
+
+document.getElementById("modeButtons").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-mode]");
+  if(!btn) return;
+  document.querySelectorAll("#modeButtons .segBtn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  P.mode = btn.dataset.mode;
+  updateChips();
+});
+
+document.getElementById("trajectoryButtons").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-traj]");
+  if(!btn) return;
+  document.querySelectorAll("#trajectoryButtons .segBtn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  P.trajectory = parseInt(btn.dataset.traj, 10);
+  if(!playing) drawEmptyScene();
+});
+
+function zeros(r,c){ return Array.from({length:r}, () => Array(c).fill(0)); }
+function eye(n){ return Array.from({length:n}, (_,i) => Array.from({length:n}, (_,j) => i===j ? 1 : 0)); }
+function transpose(A){ return A[0].map((_,j) => A.map(row => row[j])); }
+function matmul(A,B){
+  const r=A.length, k=A[0].length, c=B[0].length;
+  const C=zeros(r,c);
+  for(let i=0;i<r;i++){
+    for(let p=0;p<k;p++){
+      const aip=A[i][p];
+      if(Math.abs(aip) < 1e-14) continue;
+      for(let j=0;j<c;j++) C[i][j]+=aip*B[p][j];
+    }
+  }
+  return C;
+}
+function matVec(A,v){
+  const out = Array(A.length).fill(0);
+  for(let i=0;i<A.length;i++){
+    let s=0;
+    for(let j=0;j<A[i].length;j++) s += A[i][j] * v[j];
+    out[i]=s;
+  }
+  return out;
+}
+function matadd(A,B){ return A.map((r,i) => r.map((v,j) => v+B[i][j])); }
+function matscale(A,s){ return A.map(r => r.map(v => v*s)); }
+function catH(A,B){ return A.map((r,i) => r.concat(B[i])); }
+function catV(A,B){ return A.concat(B); }
+function blockSet(M, r0, c0, B){
+  for(let r=0;r<B.length;r++) for(let c=0;c<B[0].length;c++) M[r0+r][c0+c]=B[r][c];
+}
+function matrixPower(A,n){
+  if(n === 0) return eye(A.length);
+  let R = eye(A.length);
+  for(let i=0;i<n;i++) R = matmul(R,A);
+  return R;
+}
+function solveLinear(A,b){
+  const n = A.length;
+  const M = A.map((row,i) => row.slice().concat([b[i]]));
+  for(let i=0;i<n;i++){
+    M[i][i] += 1e-9;
+  }
+  for(let col=0;col<n;col++){
+    let pivot = col;
+    for(let r=col+1;r<n;r++) if(Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+    if(Math.abs(M[pivot][col]) < 1e-12) M[pivot][col] = 1e-12;
+    if(pivot !== col){ const tmp=M[col]; M[col]=M[pivot]; M[pivot]=tmp; }
+    const div = M[col][col];
+    for(let c=col;c<=n;c++) M[col][c] /= div;
+    for(let r=0;r<n;r++){
+      if(r === col) continue;
+      const factor = M[r][col];
+      if(Math.abs(factor) < 1e-14) continue;
+      for(let c=col;c<=n;c++) M[r][c] -= factor*M[col][c];
+    }
+  }
+  return M.map(row => row[n]);
+}
+function matrixRank(A, tol=1e-8){
+  const M = A.map(r => r.slice());
+  const rows = M.length, cols = M[0].length;
+  let rank = 0;
+  for(let col=0; col<cols && rank<rows; col++){
+    let pivot = rank;
+    for(let r=rank+1;r<rows;r++) if(Math.abs(M[r][col]) > Math.abs(M[pivot][col])) pivot = r;
+    if(Math.abs(M[pivot][col]) <= tol) continue;
+    const tmp=M[rank]; M[rank]=M[pivot]; M[pivot]=tmp;
+    const div = M[rank][col];
+    for(let c=col;c<cols;c++) M[rank][c] /= div;
+    for(let r=0;r<rows;r++){
+      if(r === rank) continue;
+      const factor=M[r][col];
+      for(let c=col;c<cols;c++) M[r][c] -= factor*M[rank][c];
+    }
+    rank++;
+  }
+  return rank;
+}
+
+function stateSpace(){
+  const {m,Iz,Caf,Car,lf,lr,Ts,x_dot} = P;
+  const A1 = -(2*Caf+2*Car)/(m*x_dot);
+  const A2 = -x_dot - (2*Caf*lf - 2*Car*lr)/(m*x_dot);
+  const A3 = -(2*lf*Caf - 2*lr*Car)/(Iz*x_dot);
+  const A4 = -(2*lf*lf*Caf + 2*lr*lr*Car)/(Iz*x_dot);
+  const A = [[A1,0,A2,0],[0,0,1,0],[A3,0,A4,0],[1,x_dot,0,0]];
+  const B = [[2*Caf/m],[0],[2*lf*Caf/Iz],[0]];
+  const C = [[0,1,0,0],[0,0,0,1]];
+  const Ad = A.map((row,i) => row.map((v,j) => (i===j?1:0) + Ts*v));
+  const Bd = B.map(row => [Ts*row[0]]);
+  return {A,B,C,Ad,Bd};
+}
+
+function buildMPC(Ad,Bd,hz){
+  const ns=4, nu=1, no=2, na=5;
+  const C = [[0,1,0,0],[0,0,0,1]];
+  const Caug = catH(C, zeros(no,nu));
+  const Aaug = catV(catH(Ad,Bd), catH(zeros(nu,ns), eye(nu)));
+  const Baug = catV(Bd, eye(nu));
+  const Q = [[P.Qpsi,0],[0,P.Qy]];
+  const S = [[P.Qpsi,0],[0,P.Qy]];
+  const R = [[P.Rw]];
+  const CQC = matmul(matmul(transpose(Caug), Q), Caug);
+  const CSC = matmul(matmul(transpose(Caug), S), Caug);
+  const QC = matmul(Q, Caug);
+  const SC = matmul(S, Caug);
+  const Qdb = zeros(na*hz, na*hz);
+  const Tdb = zeros(no*hz, na*hz);
+  const Rdb = zeros(nu*hz, nu*hz);
+  const Cdb = zeros(na*hz, nu*hz);
+  const Adc = zeros(na*hz, na);
+  const powers = [eye(na)];
+  for(let i=1;i<=hz;i++) powers.push(matmul(powers[i-1], Aaug));
+  for(let i=0;i<hz;i++){
+    blockSet(Qdb, na*i, na*i, i === hz-1 ? CSC : CQC);
+    blockSet(Tdb, no*i, na*i, i === hz-1 ? SC : QC);
+    blockSet(Rdb, nu*i, nu*i, R);
+    blockSet(Adc, na*i, 0, powers[i+1]);
+    for(let j=0;j<=i;j++){
+      const blk = matmul(powers[i-j], Baug);
+      blockSet(Cdb, na*i, nu*j, blk);
+    }
+  }
+  const Hdb = matadd(matmul(matmul(transpose(Cdb), Qdb), Cdb), Rdb);
+  const top = matmul(matmul(transpose(Adc), Qdb), Cdb);
+  const bottom = matmul(matscale(Tdb,-1), Cdb);
+  const Fdbt = catV(top, bottom);
+  return {Hdb,Fdbt,Cdb,Adc,Aaug,Baug};
+}
+
+function trajectoryGen(t){
+  const x = t.map(tt => P.x_dot * tt);
+  const y = [];
+  if(P.trajectory === 1){
+    for(let i=0;i<t.length;i++) y.push(-9);
+  } else if(P.trajectory === 2){
+    const mid = t[t.length-1] / 2;
+    for(let i=0;i<t.length;i++) y.push(9 * Math.tanh(t[i] - mid));
+  } else {
+    const aaa = (-28 / (100*100)) / 1.1;
+    const bbb = aaa < 0 ? 14 : -14;
+    for(let i=0;i<t.length;i++){
+      const y1 = aaa * Math.pow(x[i] + P.lane_width - 100, 2) + bbb;
+      const y2 = 2 * P.waveAmp * Math.sin(2 * Math.PI * P.waveFreq * x[i]);
+      y.push((y1 + y2) / 2);
+    }
+  }
+  const psi = Array(t.length).fill(0);
+  for(let i=0;i<t.length-1;i++) psi[i] = Math.atan2(y[i+1]-y[i], x[i+1]-x[i]);
+  psi[t.length-1] = psi[t.length-2] || 0;
+  for(let i=1;i<psi.length;i++){
+    let d = psi[i] - psi[i-1];
+    if(d < -Math.PI) psi[i] += 2*Math.PI;
+    if(d > Math.PI) psi[i] -= 2*Math.PI;
+  }
+  return {X_ref:x, Y_ref:y, psi_ref:psi};
+}
+
+function openLoopUpdate(states,U){
+  const {m,Iz,Caf,Car,lf,lr,Ts,x_dot} = P;
+  let [vy, psi, r, Y] = states;
+  const sub = 30;
+  for(let i=0;i<sub;i++){
+    const vyDot = -(2*Caf+2*Car)/(m*x_dot)*vy + (-x_dot-(2*Caf*lf-2*Car*lr)/(m*x_dot))*r + 2*Caf/m*U;
+    const rDot = -(2*lf*Caf-2*lr*Car)/(Iz*x_dot)*vy - (2*lf*lf*Caf+2*lr*lr*Car)/(Iz*x_dot)*r + 2*lf*Caf/Iz*U;
+    const YDot = Math.sin(psi)*x_dot + Math.cos(psi)*vy;
+    vy += vyDot * Ts/sub;
+    psi += r * Ts/sub;
+    r += rDot * Ts/sub;
+    Y += YDot * Ts/sub;
+  }
+  return [vy, psi, r, Y];
+}
+
+function analyzeRanks(A,B,C,Ad,Bd){
+  const ctrl = [];
+  let Ap = eye(4);
+  for(let i=0;i<4;i++){
+    const blk = matmul(Ap,B);
+    for(let r=0;r<4;r++){
+      if(!ctrl[r]) ctrl[r]=[];
+      ctrl[r].push(blk[r][0]);
+    }
+    Ap = matmul(Ap,A);
+  }
+  const obs = [];
+  Ap = eye(4);
+  for(let i=0;i<4;i++){
+    const blk = matmul(C,Ap);
+    for(let r=0;r<blk.length;r++) obs.push(blk[r].slice());
+    Ap = matmul(Ap,A);
+  }
+  return {rankC: matrixRank(ctrl), rankO: matrixRank(obs)};
+}
+
+function runSimulation(){
+  const n = Math.round(P.time_length / P.Ts) + 1;
+  const t = Array.from({length:n}, (_,i) => i*P.Ts);
+  const {X_ref,Y_ref,psi_ref} = trajectoryGen(t);
+  const ss = stateSpace();
+  const hz = Math.max(1, Math.round(P.hz));
+  const mpcCache = {};
+  const getMPC = (h) => { const key = String(h); if(!mpcCache[key]) mpcCache[key] = buildMPC(ss.Ad, ss.Bd, h); return mpcCache[key]; };
+  const ranks = analyzeRanks(ss.A,ss.B,ss.C,ss.Ad,ss.Bd);
+  let states = [0, 0, 0, Y_ref[0] + P.y0];
+  let U = 0;
+  let eIntYaw = 0, eIntY = 0, ePrevYaw = 0, ePrevY = 0;
+  const statesTotal = [states.slice()];
+  const UTotal = [U];
+  const duTotal = [0];
+  const Ypred = [Array(hz).fill(states[3])];
+  const psipred = [Array(hz).fill(states[1])];
+  const maxU = P.maxSteerDeg * Math.PI / 180;
+  let satCount = 0;
+
+  for(let i=0;i<n-1;i++){
+    let du = 0;
+    if(P.mode === "mpc"){
+      const curHz = Math.max(1, Math.min(hz, n-1-i));
+      const mpc = getMPC(curHz);
+      const xaug = [states[0], states[1], states[2], states[3], U];
+      const rvec = [];
+      for(let p=1;p<=curHz;p++){
+        const idx = Math.min(i+p, n-1);
+        rvec.push(psi_ref[idx], Y_ref[idx]);
+      }
+      const combined = xaug.concat(rvec);
+      const ft = matVec(transpose(mpc.Fdbt), combined);
+      const rhs = ft.map(v => -v);
+      const duSeq = solveLinear(mpc.Hdb, rhs);
+      du = duSeq[0] || 0;
+      const free = matVec(mpc.Adc, xaug);
+      const forced = matVec(mpc.Cdb, duSeq);
+      const xopt = forced.map((v,k) => v + free[k]);
+      const yp = [], pp = [];
+      for(let p=0;p<curHz;p++){
+        yp.push(xopt[p*5+3]);
+        pp.push(xopt[p*5+1]);
+      }
+      Ypred.push(yp);
+      psipred.push(pp);
+      U += du;
+    } else if(P.mode === "pid"){
+      const eYaw = psi_ref[i] - states[1];
+      const eY = Y_ref[i] - states[3];
+      const dYaw = (eYaw - ePrevYaw) / P.Ts;
+      const dY = (eY - ePrevY) / P.Ts;
+      if(Math.abs(P.KiYaw) > 1e-12) eIntYaw += 0.5*(eYaw+ePrevYaw)*P.Ts;
+      if(Math.abs(P.KiY) > 1e-12) eIntY += 0.5*(eY+ePrevY)*P.Ts;
+      U = P.KpYaw*eYaw + P.KdYaw*dYaw + P.KiYaw*eIntYaw + P.KpY*eY + P.KdY*dY + P.KiY*eIntY;
+      ePrevYaw = eYaw; ePrevY = eY;
+      Ypred.push([]); psipred.push([]);
+    } else {
+      U = 0;
+      Ypred.push([]); psipred.push([]);
+    }
+    if(U > maxU){ U = maxU; satCount++; }
+    if(U < -maxU){ U = -maxU; satCount++; }
+    states = openLoopUpdate(states,U);
+    statesTotal.push(states.slice());
+    UTotal.push(U);
+    duTotal.push(du);
+  }
+
+  const metrics = computeMetrics(t, statesTotal, UTotal, Y_ref, psi_ref, satCount, ranks);
+  return {t,X_ref,Y_ref,psi_ref,statesTotal,UTotal,duTotal,Ypred,psipred,metrics,ranks,hz,maxU};
+}
+
+function computeMetrics(t, statesTotal, UTotal, Yref, psiref, satCount, ranks){
+  let seY=0, sePsi=0, maxEY=0, maxEPsi=0, maxU=0;
+  for(let i=0;i<statesTotal.length;i++){
+    const eY = statesTotal[i][3] - Yref[i];
+    const ePsi = statesTotal[i][1] - psiref[i];
+    seY += eY*eY; sePsi += ePsi*ePsi;
+    maxEY = Math.max(maxEY, Math.abs(eY));
+    maxEPsi = Math.max(maxEPsi, Math.abs(ePsi));
+    maxU = Math.max(maxU, Math.abs(UTotal[i] || 0));
+  }
+  const N=statesTotal.length;
+  const finalY = statesTotal[N-1][3] - Yref[N-1];
+  const finalPsi = statesTotal[N-1][1] - psiref[N-1];
+  return {
+    rmseY: Math.sqrt(seY/N), rmsePsi: Math.sqrt(sePsi/N),
+    maxEY, maxEPsi, maxU, finalY, finalPsi,
+    satPct: 100*satCount/Math.max(1,N-1), rankC:ranks.rankC, rankO:ranks.rankO
+  };
+}
+
+const simCanvas = document.getElementById("simCanvas");
+const ctx = simCanvas.getContext("2d");
+const chartCanvases = ["chartSteer","chartYaw","chartY","chartErr"].map(id => document.getElementById(id));
+const chartCtx = chartCanvases.map(c => c.getContext("2d"));
+
+function resizeAll(){
+  const rect = simCanvas.parentElement.getBoundingClientRect();
+  simCanvas.width = Math.max(400, Math.floor(rect.width * devicePixelRatio));
+  simCanvas.height = Math.max(300, Math.floor(rect.height * devicePixelRatio));
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  chartCanvases.forEach(c => {
+    const r = c.parentElement.getBoundingClientRect();
+    c.width = Math.floor(r.width * devicePixelRatio);
+    c.height = Math.floor((r.height - 24) * devicePixelRatio);
+    const cx = c.getContext("2d");
+    cx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  });
+  drawCurrent();
+}
+
+function roundedRect(ctx,x,y,w,h,r){
+  const rr = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+rr,y); ctx.arcTo(x+w,y,x+w,y+h,rr); ctx.arcTo(x+w,y+h,x,y+h,rr);
+  ctx.arcTo(x,y+h,x,y,rr); ctx.arcTo(x,y,x+w,y,rr); ctx.closePath();
+}
+
+function drawCurrent(){
+  if(simData) drawScene(simData, Math.min(frame, simData.statesTotal.length-1));
+  else drawEmptyScene();
+}
+
+function drawEmptyScene(){
+  const d = quickReferenceOnly();
+  drawScene(d, 0, true);
+  drawCharts(null, 0);
+}
+
+function quickReferenceOnly(){
+  const n = Math.round(P.time_length / P.Ts) + 1;
+  const t = Array.from({length:n}, (_,i) => i*P.Ts);
+  const ref = trajectoryGen(t);
+  const statesTotal = t.map((_,i) => [0, ref.psi_ref[i], 0, ref.Y_ref[i]]);
+  const UTotal = t.map(() => 0);
+  return {...ref, t, statesTotal, UTotal, Ypred:[], psipred:[], hz:Math.round(P.hz), maxU:P.maxSteerDeg*Math.PI/180, metrics:null};
+}
+
+function drawScene(data, idx, preview=false){
+  const W = simCanvas.parentElement.clientWidth;
+  const H = simCanvas.parentElement.clientHeight;
+  ctx.clearRect(0,0,W,H);
+  const grad = ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,"#050914"); grad.addColorStop(0.55,"#07142a"); grad.addColorStop(1,"#050914");
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+  const {X_ref,Y_ref,statesTotal,UTotal,Ypred,t} = data;
+  const ii = Math.min(idx, X_ref.length-1);
+  const carX = X_ref[ii];
+  const carY = statesTotal[ii][3];
+  const minY = Math.min(...Y_ref) - 22;
+  const maxY = Math.max(...Y_ref) + 22;
+  const viewX = Math.max(80, (X_ref[X_ref.length-1] - X_ref[0]) * 0.32);
+  const scale = Math.min(W/viewX, H/(maxY-minY)) * 0.78;
+  const ox = W*0.42, oy = H*0.52;
+  const tx = x => (x - carX) * scale + ox;
+  const ty = y => oy - (y - carY) * scale;
+
+  drawGrid(W,H);
+  drawLaneSystem(data,tx,ty);
+  drawReferencePath(data,tx,ty);
+  drawDrivenPath(data,idx,tx,ty,preview);
+  drawPrediction(data,idx,tx,ty,preview);
+  drawVehicle(data,idx,tx,ty,scale,preview);
+  drawScaleNote(W,H,data,idx,preview);
+  updateLive(data,idx,preview);
+}
+
+function drawGrid(W,H){
+  ctx.save(); ctx.strokeStyle="rgba(255,255,255,.035)"; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=48){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=48){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.restore();
+}
+function drawLaneSystem(data,tx,ty){
+  const offsets = [-2.5,-1.5,-0.5,0.5,1.5,2.5].map(v => v*P.lane_width);
+  offsets.forEach((off,k) => {
+    ctx.beginPath();
+    ctx.strokeStyle = k===0 || k===offsets.length-1 ? "rgba(150,167,199,.5)" : "rgba(150,167,199,.18)";
+    ctx.lineWidth = k===0 || k===offsets.length-1 ? 2 : 1;
+    if(k>0 && k<offsets.length-1) ctx.setLineDash([16,12]); else ctx.setLineDash([]);
+    for(let i=0;i<data.X_ref.length;i++){
+      const x=tx(data.X_ref[i]), y=ty(data.Y_ref[i]+off);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  });
+}
+function drawReferencePath(data,tx,ty){
+  ctx.save();
+  ctx.beginPath(); ctx.strokeStyle="#4f8cff"; ctx.lineWidth=3; ctx.shadowColor="rgba(79,140,255,.65)"; ctx.shadowBlur=14;
+  for(let i=0;i<data.X_ref.length;i++){
+    const x=tx(data.X_ref[i]), y=ty(data.Y_ref[i]);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+function drawDrivenPath(data,idx,tx,ty,preview){
+  if(preview || idx < 2) return;
+  ctx.save();
+  ctx.beginPath(); ctx.strokeStyle="#72f2a5"; ctx.lineWidth=3; ctx.shadowColor="rgba(114,242,165,.45)"; ctx.shadowBlur=10;
+  for(let i=0;i<=idx && i<data.statesTotal.length;i++){
+    const x=tx(data.X_ref[i]), y=ty(data.statesTotal[i][3]);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.restore();
+}
+function drawPrediction(data,idx,tx,ty,preview){
+  if(preview || !data.Ypred || !data.Ypred[idx] || data.Ypred[idx].length < 2 || P.mode !== "mpc") return;
+  ctx.save();
+  ctx.beginPath(); ctx.strokeStyle="#b56cff"; ctx.lineWidth=2; ctx.setLineDash([7,5]); ctx.shadowColor="rgba(181,108,255,.5)"; ctx.shadowBlur=8;
+  const p = data.Ypred[idx];
+  for(let j=0;j<p.length;j++){
+    const ind = Math.min(idx+j+1, data.X_ref.length-1);
+    const x = tx(data.X_ref[ind]), y = ty(p[j]);
+    if(j===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+}
+function drawVehicle(data,idx,tx,ty,scale,preview){
+  const ii = Math.min(idx, data.statesTotal.length-1);
+  const s = data.statesTotal[ii];
+  const x = tx(data.X_ref[ii]);
+  const y = ty(s[3]);
+  const psi = s[1];
+  const U = data.UTotal[ii] || 0;
+  const Lf = P.lf * scale * 0.8;
+  const Lr = P.lr * scale * 0.8;
+  const halfW = Math.max(8, scale*0.42);
+  ctx.save(); ctx.translate(x,y); ctx.rotate(-psi);
+  ctx.shadowColor="rgba(46,230,214,.4)"; ctx.shadowBlur=15;
+  const bodyGrad = ctx.createLinearGradient(-Lr,-halfW,Lf,halfW);
+  bodyGrad.addColorStop(0,"#16264c"); bodyGrad.addColorStop(1,"#2ee6d6");
+  ctx.fillStyle=bodyGrad; ctx.strokeStyle="#eaf2ff"; ctx.lineWidth=1.4;
+  roundedRect(ctx, -Lr-8, -halfW, Lf+Lr+16, halfW*2, 8); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.fillStyle="rgba(255,255,255,.28)"; roundedRect(ctx,-Lr+8,-halfW*.58,Lf*.5,halfW*1.16,5); ctx.fill();
+  ctx.strokeStyle="#07101f"; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(-Lr, -halfW-3); ctx.lineTo(-Lr, halfW+3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(Lf, -halfW-3); ctx.lineTo(Lf, halfW+3); ctx.stroke();
+  ctx.save(); ctx.translate(Lf,0); ctx.rotate(-U); ctx.strokeStyle="#ff5c7a"; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(0,-halfW-5); ctx.lineTo(0,halfW+5); ctx.stroke(); ctx.restore();
+  ctx.strokeStyle="#ffd166"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.max(28,Lf+28),0); ctx.stroke();
+  ctx.restore();
+
+  if(!preview){
+    ctx.save(); ctx.fillStyle="rgba(234,242,255,.9)"; ctx.font="11px Inter, Arial";
+    ctx.fillText(`delta=${U.toFixed(3)} rad`, x+14, y-18);
+    ctx.restore();
+  }
+}
+function drawScaleNote(W,H,data,idx,preview){
+  ctx.save(); ctx.fillStyle="rgba(234,242,255,.55)"; ctx.font="11px Inter, Arial";
+  const text = preview ? "Set parameters, then run the simulation" : `Frame ${idx}/${data.statesTotal.length-1}`;
+  ctx.fillText(text, 18, H-22);
+  ctx.restore();
+}
+function updateLive(data,idx,preview){
+  const i = Math.min(idx, data.statesTotal.length-1);
+  const s = data.statesTotal[i];
+  const eY = s[3] - data.Y_ref[i];
+  document.getElementById("liveTime").textContent = (data.t[i] || 0).toFixed(2) + " s";
+  document.getElementById("liveSteer").textContent = (data.UTotal[i] || 0).toFixed(3) + " rad";
+  document.getElementById("liveYaw").textContent = s[1].toFixed(3) + " rad";
+  document.getElementById("liveErr").textContent = Math.abs(eY).toFixed(2) + " m";
+  document.getElementById("progressFill").style.width = preview ? "0%" : `${100*i/(data.statesTotal.length-1)}%`;
+  const saturated = !preview && Math.abs(data.UTotal[i] || 0) >= data.maxU - 1e-4;
+  document.getElementById("satAlert").style.display = saturated ? "block" : "none";
+}
+
+function drawCharts(data,idx){
+  if(!data){
+    chartCtx.forEach((c,k) => blankChart(c,k));
+    return;
+  }
+  const n = Math.max(1, idx+1);
+  drawLineChart(chartCtx[0], data.t.slice(0,n), data.UTotal.slice(0,n), null, "#ff5c7a", data.maxU, -data.maxU);
+  drawLineChart(chartCtx[1], data.t.slice(0,n), data.statesTotal.slice(0,n).map(s=>s[1]), data.psi_ref.slice(0,n), "#2ee6d6");
+  drawLineChart(chartCtx[2], data.t.slice(0,n), data.statesTotal.slice(0,n).map(s=>s[3]), data.Y_ref.slice(0,n), "#72f2a5");
+  drawLineChart(chartCtx[3], data.t.slice(0,n), data.statesTotal.slice(0,n).map((s,i)=>s[3]-data.Y_ref[i]), null, "#ffd166", 0, 0);
+}
+function blankChart(ctx,k){
+  const W = ctx.canvas.parentElement.clientWidth, H = ctx.canvas.parentElement.clientHeight - 24;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle="#081022"; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="rgba(255,255,255,.06)"; ctx.lineWidth=1;
+  for(let y=H*.25;y<H;y+=H*.25){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+}
+function drawLineChart(ctx,t,vals,refVals,color,limitTop=null,limitBot=null){
+  const W = ctx.canvas.parentElement.clientWidth, H = ctx.canvas.parentElement.clientHeight - 24;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle="#081022"; ctx.fillRect(0,0,W,H);
+  if(vals.length < 2) return;
+  const all = vals.concat(refVals || []);
+  if(limitTop !== null) all.push(limitTop);
+  if(limitBot !== null) all.push(limitBot);
+  let mn = Math.min(...all), mx = Math.max(...all);
+  if(Math.abs(mx-mn)<1e-9){ mx += 1; mn -= 1; }
+  const pad = 0.12*(mx-mn); mn -= pad; mx += pad;
+  const sx = i => (i / Math.max(1, vals.length-1)) * W;
+  const sy = v => H - ((v-mn)/(mx-mn))*H;
+  ctx.strokeStyle="rgba(255,255,255,.06)"; ctx.lineWidth=1;
+  for(let y=H*.25;y<H;y+=H*.25){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  if(limitTop !== null){
+    ctx.strokeStyle="rgba(255,92,122,.45)"; ctx.setLineDash([5,4]); ctx.beginPath(); ctx.moveTo(0,sy(limitTop)); ctx.lineTo(W,sy(limitTop)); ctx.stroke();
+    if(limitBot !== null){ ctx.beginPath(); ctx.moveTo(0,sy(limitBot)); ctx.lineTo(W,sy(limitBot)); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  if(refVals && refVals.length>1){
+    ctx.strokeStyle="rgba(79,140,255,.7)"; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); ctx.beginPath();
+    refVals.forEach((v,i) => i ? ctx.lineTo(sx(i),sy(v)) : ctx.moveTo(sx(i),sy(v))); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  vals.forEach((v,i) => i ? ctx.lineTo(sx(i),sy(v)) : ctx.moveTo(sx(i),sy(v))); ctx.stroke();
+  ctx.fillStyle="rgba(234,242,255,.5)"; ctx.font="10px Inter, Arial";
+  ctx.fillText(mx.toFixed(2), 5, 12); ctx.fillText(mn.toFixed(2), 5, H-5);
+}
+
+function updateScoreboard(data){
+  if(!data || !data.metrics){
+    ["mFinalY","mRmseY","mMaxDelta","mSatPct","mRmsePsi","mRank"].forEach(id => document.getElementById(id).textContent = id==="mRank" ? "4 / 4" : "-");
+    return;
+  }
+  const m = data.metrics;
+  document.getElementById("mFinalY").textContent = m.finalY.toExponential(2) + " m";
+  document.getElementById("mRmseY").textContent = m.rmseY.toFixed(3) + " m";
+  document.getElementById("mMaxDelta").textContent = m.maxU.toFixed(3) + " rad";
+  document.getElementById("mSatPct").textContent = m.satPct.toFixed(1) + "%";
+  document.getElementById("mRmsePsi").textContent = m.rmsePsi.toFixed(3) + " rad";
+  document.getElementById("mRank").textContent = `${m.rankC} / ${m.rankO}`;
+}
+
+function tick(ts){
+  if(!playing || !simData) return;
+  if(!lastTick) lastTick = ts;
+  const elapsed = ts - lastTick;
+  const framesToAdvance = Math.max(1, Math.floor(elapsed / (20 / playSpeed)));
+  if(elapsed > 20 / playSpeed){
+    frame += framesToAdvance;
+    lastTick = ts;
+    if(frame >= simData.statesTotal.length){ frame = simData.statesTotal.length - 1; playing = false; setRunButton(false); }
+    drawScene(simData, frame);
+    drawCharts(simData, frame);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function setRunButton(isRunning){
+  const btn = document.getElementById("runBtn");
+  if(isRunning){ btn.textContent = "STOP SIMULATION"; btn.classList.remove("run"); btn.classList.add("stop"); }
+  else { btn.textContent = "RUN SIMULATION"; btn.classList.add("run"); btn.classList.remove("stop"); }
+}
+
+document.getElementById("runBtn").addEventListener("click", () => {
+  if(playing){
+    playing = false; cancelAnimationFrame(rafId); setRunButton(false); return;
+  }
+  try{
+    const btn = document.getElementById("runBtn");
+    btn.textContent = "COMPUTING...";
+    setTimeout(() => {
+      simData = runSimulation();
+      frame = 0; lastTick = 0;
+      updateScoreboard(simData);
+      playing = true; setRunButton(true);
+      drawScene(simData,0); drawCharts(simData,0);
+      rafId = requestAnimationFrame(tick);
+    }, 20);
+  }catch(err){
+    alert("Simulation error: " + err.message);
+    setRunButton(false);
+  }
+});
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  playing = false; cancelAnimationFrame(rafId); setRunButton(false);
+  simData = null; frame = 0; lastTick = 0;
+  updateScoreboard(null); drawEmptyScene();
+});
+
+document.getElementById("csvBtn").addEventListener("click", () => {
+  if(!simData){ alert("Run a simulation first, then export CSV."); return; }
+  const rows = [["t","X_ref","Y_ref","psi_ref","vy","psi","r","Y","delta","eY","ePsi"]];
+  for(let i=0;i<simData.t.length;i++){
+    const s = simData.statesTotal[i];
+    rows.push([simData.t[i],simData.X_ref[i],simData.Y_ref[i],simData.psi_ref[i],s[0],s[1],s[2],s[3],simData.UTotal[i],s[3]-simData.Y_ref[i],s[1]-simData.psi_ref[i]]);
+  }
+  const csv = rows.map(r => r.join(",")).join("\n");
+  const blob = new Blob([csv], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "mpc_lane_change_results.csv"; a.click();
+  URL.revokeObjectURL(url);
+});
+
+mountSliders();
+updateChips();
+window.addEventListener("resize", resizeAll);
+resizeAll();
+drawEmptyScene();
+</script>
+</body>
+</html>
